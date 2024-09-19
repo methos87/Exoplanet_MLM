@@ -66,7 +66,12 @@ on observed features from the Kepler dataset.
 
 ## Docker
 
-1. **Load the Image
+1. **Download the Image**
+   ```bash
+   docker load -i docker/exobolygo-image.tar
+   ```
+
+2. **Load the Image**
    ```bash
    docker load -i docker/exobolygo-image.tar
    ```

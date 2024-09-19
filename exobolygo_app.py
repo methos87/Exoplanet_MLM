@@ -124,7 +124,7 @@ class Predict(Resource):
             y_pred_status = [status_mapping[pred] for pred in y_pred_list]
 
             # Sikeres előrejelzés visszaadása
-            return {'üzenet': 'Előrejelzés sikeres', 'predikció': y_pred_status}, 200
+            return {'üzenet': 'Előrejelzés sikeres', 'predikciósudo ': y_pred_status}, 200
 
         except Exception as e:
             # Hiba esetén belső szerverhiba üzenet
