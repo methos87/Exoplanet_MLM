@@ -6,7 +6,7 @@ This project focuses on identifying exoplanets from Kepler's dataset using vario
 ## Installation
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
+   git clone [<repository-url>](https://github.com/methos87/Exoplanet_MLM.git)
    cd kepler-exobolygok-ml
    ```
 
