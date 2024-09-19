@@ -14,26 +14,40 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 
 
+# MLModel osztály létrehozása
 class MLModel:
     def __init__(self):
+        # Üres DataFrame létrehozása a bejövő adatokhoz
         self.exo_data = pd.DataFrame()
+
+        # Modell betöltése, ha a fájl létezik, különben üzenet kiírása
         self.model = (MLModel.load_model("src/models/lgbm_model.pkl")
                       if os.path.exists("src/models/lgbm_model.pkl")
-                      else print("src/models/lgbm_model.pkl does not exist"))
+                      else print("src/models/lgbm_model.pkl nem létezik"))
 
+    # Előrejelzési függvény
     def predict(self, inference_row):
         try:
+            # Az előrejelzési adatok sorozattá alakítása
             infer_array = pd.Series(inference_row, dtype=str)
+
+            # Előfeldolgozási folyamat futtatása az előrejelzési adatokra
             df = self.preprocessing_pipeline_inference(infer_array)
+
+            # Előrejelzés a betöltött modell segítségével
             y_pred = self.model.predict(df)
 
-            return jsonify({'prediction': y_pred.tolist()})
+            # Az előrejelzés visszaadása JSON formátumban
+            return jsonify({'predikció': y_pred.tolist()})
 
         except Exception as e:
-            return jsonify({'message': 'Internal Server Error', 'error': str(e)}), 500
+            # Hiba esetén belső szerverhiba üzenet visszaadása
+            return jsonify({'üzenet': 'Belső szerverhiba', 'hiba': str(e)}), 500
 
+    # Adatok előfeldolgozási folyamatának definiálása
     def preprocessing_pipeline(self, exo_column_names, exo_data):
 
+        # Mappa létrehozása az adatok tárolására
         folder = 'data/'
         MLModel.create_new_folder(folder)
 
@@ -43,8 +57,10 @@ class MLModel:
         folder = 'json/'
         MLModel.create_new_folder(folder)
 
+        # Az exo_data CSV fájl mentése
         exo_data.to_csv("data/exo_data.csv")
 
+        # Az oszlopnevek megfelelő beállítása
         exo_column_names = exo_column_names.iloc[:-1, :]
         exo_column_names = exo_column_names.iloc[2:, :]
 
@@ -58,33 +74,39 @@ class MLModel:
                                               .replace(']', '')
                                               .replace('.', ''))
 
-        # Convert and write JSON object to file
+        # JSON objektum írása fájlba
         with open("json/columns_names.json", "w") as outfile:
             json.dump(column_names, outfile)
 
+        # Adattípusok betöltése a JSON fájlból
         with open('json/data_types.json', 'r') as file:
             data_types = json.load(file)
 
+        # CSV fájl beolvasása DataFrame-be
         self.exo_data = pd.read_csv(r"data/exo_data.csv",
                                     low_memory=False,
                                     skip_blank_lines=True,
                                     header=1,
                                     dtype=data_types)
 
+        # Mintadata mentése JSON formátumban
         sample_data = self.exo_data.loc[0]
         sample_data.to_json("json/sample_data.json", orient='index')
 
         self.exo_data = self.exo_data.iloc[1:]
 
+        # Az oszlopnevek beállítása
         with open('json/columns_names.json', 'r') as file:
             column_names = json.load(file)
 
         self.exo_data = self.exo_data.rename(columns=column_names, inplace=False)
 
+        # Üres oszlopok eltávolítása
         for column in self.exo_data.columns:
             if not self.exo_data[column].any():
                 self.exo_data = self.exo_data.drop(column, axis=1)
 
+        # Eltávolítandó oszlopok nevei
         drop_names = ["Vetting_Status",
                       "rowid",
                       "Date_of_Last_Parameter_Update",
@@ -98,19 +120,23 @@ class MLModel:
 
         self.exo_data = self.exo_data.drop(drop_names, axis=1)
 
+        # Az új DataFrame mentése
         self.exo_data.to_csv(r"data/exo_data_new.csv")
 
+        # Categorical oszlopok kiválasztása
         self.exo_data.Exoplanet_Archive_Disposition.value_counts()
 
         categorical = self.exo_data.select_dtypes(include=[object])
 
         le = LabelEncoder()
 
+        # Categorical oszlopok kódolása
         for column in ['Exoplanet_Archive_Disposition', 'Comment', 'Planetary_Fit_Type',
                        'Limb_Darkening_Model', 'Parameters_Provenance', 'TCE_Delivery',
                        'Quarters', 'Transit_Model', 'Stellar_Parameter_Provenance']:
             self.exo_data[column + "_Encoded"] = le.fit_transform(self.exo_data[column])
 
+        # Hiányzó értékek ellenőrzése
         nulls = self.exo_data.isnull().sum()
         count = 1
 
@@ -118,12 +144,16 @@ class MLModel:
             # print(f"{count}  {key}{(70 - len(key)) * ' '}{value}")
             count += 1
 
+        # Categorical oszlopok eltávolítása
         self.exo_data.drop(categorical.columns, inplace=True, axis=1)
 
+        # Hiányzó értékek eltávolítása
         self.exo_data.dropna(subset=["Orbital_Period_Upper_Unc_days"], inplace=True)
 
+        # Végtelen értékek helyettesítése NaN-nal
         self.exo_data.replace([np.inf, -np.inf], np.nan, inplace=True)
 
+        # Súlyok kiszámítása különböző oszlopokhoz
         self.exo_data = self.create_weight(self.exo_data,
                                            "Orbital_Period_days",
                                            "Orbital_Period_Upper_Unc_days",
@@ -169,6 +199,7 @@ class MLModel:
                                            "Planet-Star_Distance_over_Star_Radius_Upper_Unc",
                                            "Planet-Star_Distance_over_Star_Radius_Lower_Unc")
 
+        # Jellemzők kiválasztása a klasszifikációhoz
         classification_features = ["Orbital_Period_days",
                                    "Orbital_Period_days_weight",
                                    "Transit_Epoch_BKJD",
@@ -207,10 +238,11 @@ class MLModel:
                                    "Stellar_Parameter_Provenance_Encoded",
                                    "Exoplanet_Archive_Disposition_Encoded", ]
 
+        # Az új adatok kiválasztása
         new_exo_data = self.exo_data[classification_features]
         new_exo_data = new_exo_data.dropna()
 
-        # Outliers
+        # Kiugró értékek észlelése
         z_scores = np.abs(stats.zscore(new_exo_data))
         threshold = 3
         outliers = (z_scores > threshold)
@@ -219,14 +251,15 @@ class MLModel:
         new_exo_data = new_exo_data.reset_index(drop=True)
         cleaned_data = new_exo_data.drop(outlier_indices, axis=0)
 
-        # Apply log transformation to specific columns
+        # Logaritmus transzformáció alkalmazása
         cleaned_data['Log_Orbital_Period'] = np.log(cleaned_data['Orbital_Period_days'] + 1)
         cleaned_data['Log_Transit_Depth'] = np.log(cleaned_data['Transit_Depth_ppm'] + 1)
 
-        print("Preprocessing is completed")
+        print("Az előfeldolgozás befejeződött")
 
         return cleaned_data
 
+    # Az adatok előfeldolgozása a predikcióhoz
     def preprocessing_pipeline_inference(self, sample_data):
 
         sample_data.to_csv("data/sample_data.csv")
@@ -377,7 +410,7 @@ class MLModel:
         sample = sample[classification_features]
         sample = sample.dropna()
 
-        # Outliers
+        # Kiugró értékek észlelése
         z_scores = np.abs(stats.zscore(sample))
         threshold = 3
         outliers = (z_scores > threshold)
@@ -386,31 +419,37 @@ class MLModel:
         sample = sample.reset_index(drop=True)
         cleaned_sample = sample.drop(outlier_indices, axis=0)
 
-        # Apply log transformation to specific columns
+        # Logaritmus transzformáció alkalmazása
         cleaned_sample['Log_Orbital_Period'] = np.log(cleaned_sample['Orbital_Period_days'] + 1)
         cleaned_sample['Log_Transit_Depth'] = np.log(cleaned_sample['Transit_Depth_ppm'] + 1)
 
-        print("Interference is completed")
+        print("Az előfeldolgozás befejeződött")
         return cleaned_sample
 
     def get_accuracy(self, X_train, X_test, y_train, y_test):
+        # A model predikciója a tanító és tesztelő adatokra
         y_train_pred = self.model.predict(X_train)
         y_test_pred = self.model.predict(X_test)
+
+        # A tanító és tesztelő adatok pontosságának kiszámítása
         train_accuracy = accuracy_score(y_train, y_train_pred)
         test_accuracy = accuracy_score(y_test, y_test_pred)
 
+        # Visszatér a tanító és tesztelő pontossággal
         return train_accuracy, test_accuracy
 
-    def train_and_save_model(self, cleaned_data):
 
+    def train_and_save_model(self, cleaned_data):
+        # A céltartomány (y) és a jellemzők (X) szétválasztása
         y_KF = cleaned_data["Exoplanet_Archive_Disposition_Encoded"]
         X_KF = cleaned_data.drop(columns="Exoplanet_Archive_Disposition_Encoded", axis=1)
 
-        # Scaling
+        # Adatok normalizálása
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X_KF)
         X_scaled = pd.DataFrame(X_scaled)
 
+        # Adatok felosztása tanító és teszt adatokra
         X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_KF, test_size=0.33, random_state=500)
         train_accuracies = []
         cv_accuracies = []
@@ -418,6 +457,7 @@ class MLModel:
         X_train = X_train.reset_index(drop=True)
         y_train = y_train.reset_index(drop=True)
 
+        # Keresztvalidáció beállítása
         kf = KFold(n_splits=5)
         kf.get_n_splits(X_train)
 
@@ -439,46 +479,56 @@ class MLModel:
                                    y_train[cv_index])
             train_accuracies.append(ac[0])
             cv_accuracies.append(ac[1])
+
+        # Átlagos pontosságok kiszámítása
         train_accuracy = np.mean(train_accuracies)
         cv_accuracy = np.mean(cv_accuracies)
 
         return train_accuracy, cv_accuracy, lgbm
 
+
     def get_accuracy_full(self, X, y):
+        # A modell teljes pontosságának kiszámítása
         y_pred = self.model.predict(X)
         accuracy = accuracy_score(y, y_pred)
 
         return accuracy
 
+
     @staticmethod
     def create_weight(data, feature, feature_err1, feature_err2):
-        # Calculate absolute and relative uncertainties
+        # Absolút és relatív bizonytalanságok kiszámítása
         data[feature + "_abs_uncertainty"] = np.abs(data[feature_err1] - data[feature_err2])
 
-        # Prevent division by zero in the relative uncertainty calculation
-        epsilon = 1e-6  # small value to avoid division by zero
-        data[feature + "_rel_uncertainty"] = data[feature + "_abs_uncertainty"] / (
-                data[feature] + epsilon)
+        # Zérusra való osztás elkerülése a relatív bizonytalanság kiszámításánál
+        epsilon = 1e-6  # Kis érték a zérus elkerülésére
+        data[feature + "_rel_uncertainty"] = data[feature + "_abs_uncertainty"] / (data[feature] + epsilon)
 
-        # Calculate weight and handle infinite values
+        # Súly kiszámítása és végtelen értékek kezelése
         data[feature + "_weight"] = 1 / (data[feature + "_rel_uncertainty"] + epsilon)
 
-        # Remove temporary columns for cleanliness
+        # Ideiglenes oszlopok eltávolítása a tisztaság érdekében
         data.drop(columns=[feature + "_abs_uncertainty", feature + "_rel_uncertainty"], inplace=True)
 
         return data
 
+
     @staticmethod
     def create_new_folder(folder):
+        # Új mappa létrehozása, ha nem létezik
         Path(folder).mkdir(parents=True, exist_ok=True)
+
 
     @staticmethod
     def save_model(model, file_path):
+        # A modell mentése fájlba
         with open(file_path, 'wb') as file:
             pickle.dump(model, file)
 
+
     @staticmethod
     def load_model(file_path):
+        # A modell betöltése fájlból
         with open(file_path, 'rb') as file:
             model = pickle.load(file)
         return model

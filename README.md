@@ -22,6 +22,7 @@ on observed features from the Kepler dataset.
 
 3. Ensure you have the necessary datasets. Place the Kepler dataset (`cumulative_2024.09.03_11.45.57.csv`) in the
    `original_dataset` folder.
+
    https://exoplanetarchive.ipac.caltech.edu/cgi-bin/TblView/nph-tblView?app=ExoTbls&config=cumulative
 
 ## Jupyter Notebook
@@ -65,7 +66,12 @@ on observed features from the Kepler dataset.
 
 ## Docker
 
-1. **Run Rest API from docker container:**
+1. **Load the Image
+   ```bash
+   docker load -i docker/exobolygo-image.tar
+   ```
+   
+2. **Run Rest API from docker container:**
     - Download the docker file.
     - Run the following command:
    ```bash
