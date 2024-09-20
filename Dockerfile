@@ -22,5 +22,4 @@ RUN pip install gunicorn
 EXPOSE 5000
 
 # Run the application using Gunicorn
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "--timeout", "120", "exobolygo_app:app"]
-
+CMD ["gunicorn", "-w", "4", "-b", "127.0.0.1:5000", "--timeout", "120", "exobolygo_app:app"]
