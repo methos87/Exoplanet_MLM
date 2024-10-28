@@ -1,4 +1,4 @@
-# Kepler Exobolygók azonosítása Machine Learning segítségével
+# Identifying Kepler Exoplanets using Machine Learning
 
 ## Description
 
